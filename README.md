@@ -53,18 +53,7 @@ Pipeline de Big Data de extremo a extremo sobre AWS. Toma datos de natalidad de 
 
 ## 4. Arquitectura
 
-```
-URL (API Banco Mundial) ─┐
-Archivos CSV (EC2) ──────┼─ script Python + cron ─> S3 raw ─> Glue Job (PySpark) ─> S3 trusted (Parquet)
-RDS MariaDB ─────────────┘                                                              │
-                                                              Glue Crawler / Glue Data Catalog (metastore único)
-                                                                                        │
-                                          Athena · EMR Hive/Hue · SparkSQL · PySpark (Jupyter)
-                                                                                        │
-                                                                                  S3 refined
-                                                                                        │
-                                                          Lambda ─> API Gateway ─> Streamlit + gráficas
-```
+![diagrama-pipeline](image.png)
 
 Diagrama editable: [`docs/arquitectura-pipeline-bigdata.drawio`](docs/arquitectura-pipeline-bigdata.drawio).
 
