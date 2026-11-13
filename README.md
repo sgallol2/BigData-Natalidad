@@ -123,8 +123,8 @@ Los archivos con valores reales (`vars.cmd`, `vars.sh`), las llaves (`*.pem`) y 
 ### Orden de ejecución
 
 1. [`00-infraestructura`](00-infraestructura): bucket de S3, security group, EC2, RDS y cluster EMR.
-2. [`02-fuentes`](02-fuentes): cargar las tablas de apoyo en RDS y los CSV en la EC2.
-3. [`03-ingesta`](03-ingesta): ejecutar la ingesta hacia `raw/`.
+2. [`02-fuentes`](02-fuentes): cargar las tablas de apoyo en RDS y descargar manualmente los CSV del DANE.
+3. [`03-ingesta`](03-ingesta): cargar los CSV manualmente a `raw/archivos/` y ejecutar la ingesta automática de RDS y la API hacia `raw/`.
 4. [`04-glue-spark`](04-glue-spark): correr el job de Glue (raw a trusted).
 5. [`05-catalogacion`](05-catalogacion): catalogar trusted en Glue y en Hive.
 6. [`06-consultas-sql`](06-consultas-sql) y [`07-pyspark`](07-pyspark): ejecutar las consultas y el notebook.
@@ -139,10 +139,10 @@ Los archivos con valores reales (`vars.cmd`, `vars.sh`), las llaves (`*.pem`) y 
 ## 9. Estado del proyecto
 
 - [x] Infraestructura base: bucket S3 con zonas, security group, EC2, RDS MariaDB
-- [x] Archivos CSV 2021 a 2025 cargados en `raw/archivos/nacimientos/`
+- [x] Archivos CSV 2021 a 2025 cargados manualmente en `raw/archivos/nacimientos/`
 - [x] Endpoint del Banco Mundial verificado
-- [ ] Tablas de apoyo en RDS (departamentos, municipios, diccionarios)
-- [ ] Ingesta automática (punto 3)
+- [x] Tablas de apoyo en RDS (departamentos, municipios, diccionarios)
+- [x] Ingesta de RDS y API ejecutada hacia `raw/`
 - [ ] Glue Job raw a trusted (punto 4)
 - [ ] Catalogación (punto 5)
 - [ ] Consultas SQL (punto 6)
