@@ -65,11 +65,20 @@ s3://bigdata-p2-<ACCOUNT_ID>/
 │   ├── archivos/nacimientos/anio=2021 ... anio=2025/
 │   ├── rds/
 │   └── url/<indicador>/
-├── trusted/        (Parquet, limpio, particionado)
+├── trusted/
+│   ├── nacimientos/anio=AAAA/  (Parquet, particionado solo por anio)
+│   ├── world_bank/             (Parquet, un archivo; indicador y pais son columnas)
+│   └── rds/                    (Parquet por tabla)
 ├── refined/        (resultados de las preguntas de negocio)
 ├── athena-results/
 └── scripts/        (scripts de los jobs de Glue)
 ```
+
+Los nacimientos se particionan solo por `anio` para evitar archivos pequeños
+por mes y permitir *partition pruning* en consultas por año; `mes` permanece
+como columna normal. La salida de World Bank no se particiona y se consolida
+con `coalesce(1)` para evitar un archivo pequeño por cada combinación de
+indicador y país.
 
 ## 5. Conceptos y tecnologías
 
@@ -143,7 +152,7 @@ Los archivos con valores reales (`vars.cmd`, `vars.sh`), las llaves (`*.pem`) y 
 - [x] Endpoint del Banco Mundial verificado
 - [x] Tablas de apoyo en RDS (departamentos, municipios, diccionarios)
 - [x] Ingesta de RDS y API ejecutada hacia `raw/`
-- [ ] Glue Job raw a trusted (punto 4)
+- [X] Glue Job raw a trusted (punto 4)
 - [ ] Catalogación (punto 5)
 - [ ] Consultas SQL (punto 6)
 - [ ] Análisis con PySpark (punto 7)
