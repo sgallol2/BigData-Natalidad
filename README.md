@@ -152,11 +152,11 @@ Los archivos con valores reales (`vars.cmd`, `vars.sh`), las llaves (`*.pem`) y 
 - [x] Endpoint del Banco Mundial verificado
 - [x] Tablas de apoyo en RDS (departamentos, municipios, diccionarios)
 - [x] Ingesta de RDS y API ejecutada hacia `raw/`
-- [X] Glue Job raw a trusted (punto 4)
-- [ ] Catalogación (punto 5)
-- [ ] Consultas SQL (punto 6)
-- [ ] Análisis con PySpark (punto 7)
-- [ ] Visualización y API (punto 8)
+- [x] Glue Job raw a trusted (punto 4)
+- [x] Catalogación de tablas en Glue Data Catalog y Athena (punto 5)
+- [x] Consultas analíticas SQL con Athena / SparkSQL (punto 6)
+- [x] Análisis descriptivo distribuido con PySpark (punto 7)
+- [x] Dashboard interactivo en Streamlit y API Gateway Serverless (punto 8)
 
 ## 10. Referencias
 
