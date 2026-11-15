@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Ingesta paginada del indicador de natalidad de World Bank Data360 a S3."""
+"""Ingesta paginada de indicadores de World Bank Data360 a S3."""
 
 import json
 import os
-import subprocess
-import tempfile
+import sys
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
-from pathlib import Path
+
+import boto3
 
 
 BASE_URL = "https://data360api.worldbank.org/data360/data"
+INDICADORES = ["WB_WDI_SP_DYN_CBRT_IN", "WB_WDI_SP_POP_TOTL"]
 DEFAULT_COUNTRIES = ("COL", "BRA", "MEX", "ARG", "CHL", "PER")
 
 
@@ -62,26 +63,80 @@ def request_page(indicator, country, skip):
             raise RuntimeError(
                 f"Data360 respondió HTTP {response.status} para {country}, skip={skip}"
             )
-        return json.load(response)
+        raw_payload = response.read()
+    return raw_payload, json.loads(raw_payload)
 
 
-def upload_page(payload, bucket, indicator, country, page, directory):
-    file_path = Path(directory) / f"page-{page:06d}.json"
-    file_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+def upload_page(raw_payload, bucket, indicator, country, page, s3_client):
     key = f"raw/url/{indicator}/REF_AREA={country}/page-{page:06d}.json"
-    subprocess.run(
-        ["aws", "s3", "cp", str(file_path), f"s3://{bucket}/{key}"],
-        check=True,
+    s3_client.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=raw_payload,
+        ContentType="application/json",
     )
     print(f"Cargado s3://{bucket}/{key}")
 
 
+def detect_year_field(records):
+    candidates = {}
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        for field, value in record.items():
+            try:
+                year = int(str(value)[:4])
+            except (TypeError, ValueError):
+                continue
+            if 1000 <= year <= 9999:
+                score = 2 if "TIME" in field.upper() or "YEAR" in field.upper() else 1
+                candidates[field] = candidates.get(field, 0) + score
+    return max(candidates, key=candidates.get) if candidates else None
+
+
+def year_from_records(records, year_field):
+    if not year_field:
+        return []
+    years = []
+    for record in records:
+        try:
+            year = int(str(record[year_field])[:4])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if 1000 <= year <= 9999:
+            years.append(year)
+    return years
+
+
+def ingest_combination(indicator, country, bucket, s3_client, first_page):
+    skip = 0
+    page = 0
+    total_records = 0
+    all_records = []
+    raw_payload, payload = first_page
+
+    while True:
+        records = extract_records(payload)
+        if not records:
+            break
+        upload_page(raw_payload, bucket, indicator, country, page, s3_client)
+        total_records += len(records)
+        all_records.extend(records)
+        page += 1
+        skip += len(records)
+        raw_payload, payload = request_page(indicator, country, skip)
+
+    year_field = detect_year_field(all_records)
+    years = year_from_records(all_records, year_field)
+    last_year = max(years) if years else "N/D"
+    print(
+        f"{indicator} {country}: {page} página(s), "
+        f"{total_records} registro(s), último año={last_year}"
+    )
+
+
 def main():
     bucket = required_env("BUCKET")
-    indicator = os.environ.get("WB_INDICATOR", "WB_WDI_SP_DYN_CBRT_IN")
     countries = tuple(
         country.strip().upper()
         for country in os.environ.get(
@@ -93,25 +148,54 @@ def main():
         raise RuntimeError("WB_COUNTRIES no contiene países")
 
     ingested_at = datetime.now(timezone.utc).isoformat()
-    print(f"Iniciando ingesta {ingested_at}; indicador={indicator}")
+    print(f"Iniciando ingesta {ingested_at}; indicadores={INDICADORES}")
 
-    with tempfile.TemporaryDirectory(prefix="wb-data360-") as directory:
-        for country in countries:
-            skip = 0
-            page = 0
-            while True:
-                payload = request_page(indicator, country, skip)
-                records = extract_records(payload)
-                if not records:
-                    break
-
-                upload_page(
-                    payload, bucket, indicator, country, page, directory
+    preflight = {}
+    failed = []
+    for indicator in INDICADORES:
+        try:
+            first_page = request_page(indicator, countries[0], 0)
+            if not extract_records(first_page[1]):
+                raise RuntimeError(
+                    f"la prueba no devolvió datos para {countries[0]}"
                 )
-                page += 1
-                skip += len(records)
+            preflight[indicator] = first_page
+            print(f"Prueba OK: {indicator} con {countries[0]}")
+        except Exception as error:
+            print(
+                f"Prueba FALLIDA: {indicator} con {countries[0]}: {error}",
+                file=sys.stderr,
+            )
+            failed.extend((indicator, country) for country in countries)
 
-            print(f"{country}: {page} página(s) cargada(s)")
+    s3_client = boto3.client("s3")
+    for indicator in INDICADORES:
+        if indicator not in preflight:
+            continue
+        for country in countries:
+            try:
+                first_page = (
+                    preflight[indicator]
+                    if country == countries[0]
+                    else request_page(indicator, country, 0)
+                )
+                if not extract_records(first_page[1]):
+                    raise RuntimeError("la respuesta no contiene datos")
+                ingest_combination(
+                    indicator, country, bucket, s3_client, first_page
+                )
+            except Exception as error:
+                print(
+                    f"FALLÓ {indicator} {country}: {error}",
+                    file=sys.stderr,
+                )
+                failed.append((indicator, country))
+
+    if failed:
+        print("Combinaciones fallidas:", file=sys.stderr)
+        for indicator, country in failed:
+            print(f"- {indicator} {country}", file=sys.stderr)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

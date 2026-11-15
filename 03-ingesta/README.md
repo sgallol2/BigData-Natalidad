@@ -5,9 +5,12 @@ del DANE:
 
 - `ingesta_archivos.sh`: sincroniza automáticamente los CSV normalizados de
   `datos/dane/nacimientos/` con la partición S3 correspondiente a cada año.
-- `ingesta_api.py`: consulta el indicador de natalidad de World Bank Data360
-  por país, recorre la paginación y sube las respuestas JSON originales a
-  `raw/url/`.
+- `ingesta_api.py`: consulta estos dos indicadores de World Bank Data360 por
+  país, recorre la paginación y sube las respuestas JSON originales a
+  `raw/url/`:
+  - `WB_WDI_SP_DYN_CBRT_IN` (tasa bruta de natalidad)
+  - `WB_WDI_SP_POP_TOTL` (población total)
+  Los países son `COL`, `BRA`, `MEX`, `ARG`, `CHL` y `PER`.
 - `ingesta_rds.sh`: extrae las tablas de apoyo de MariaDB y las sube como TSV
   a `raw/rds/`.
 
@@ -25,6 +28,12 @@ raw/url/WB_WDI_SP_DYN_CBRT_IN/REF_AREA=CHL/page-000000.json
 raw/url/WB_WDI_SP_DYN_CBRT_IN/REF_AREA=COL/page-000000.json
 raw/url/WB_WDI_SP_DYN_CBRT_IN/REF_AREA=MEX/page-000000.json
 raw/url/WB_WDI_SP_DYN_CBRT_IN/REF_AREA=PER/page-000000.json
+raw/url/WB_WDI_SP_POP_TOTL/REF_AREA=ARG/page-000000.json
+raw/url/WB_WDI_SP_POP_TOTL/REF_AREA=BRA/page-000000.json
+raw/url/WB_WDI_SP_POP_TOTL/REF_AREA=CHL/page-000000.json
+raw/url/WB_WDI_SP_POP_TOTL/REF_AREA=COL/page-000000.json
+raw/url/WB_WDI_SP_POP_TOTL/REF_AREA=MEX/page-000000.json
+raw/url/WB_WDI_SP_POP_TOTL/REF_AREA=PER/page-000000.json
 ```
 
 Los CSV del DANE se deben descargar manualmente. El portal responde por HTTP,
@@ -95,7 +104,9 @@ export WB_COUNTRIES=COL,BRA,ECU,PER
 python3 ingesta_api.py
 ```
 
-El indicador por defecto es `WB_WDI_SP_DYN_CBRT_IN`. Cada página se guarda
+Los dos indicadores se consultan para `COL,BRA,MEX,ARG,CHL,PER`. Antes de
+escribir en S3 se prueba cada indicador con `COL`; si falla o no devuelve
+datos, no se escribe ningún archivo para ese indicador. Cada página se guarda
 separadamente para conservar la respuesta original y facilitar reprocesos.
 
 La API se ejecuta manualmente cuando se requiera actualizar los datos; no se
