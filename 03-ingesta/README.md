@@ -1,5 +1,52 @@
 # Ingesta automática
 
+## Conceptos para la sustentación
+
+### ¿Qué significa ingestar?
+
+La ingesta es el movimiento controlado desde las fuentes hacia la zona `raw`
+del data lake. En esta etapa no se aplican reglas analíticas ni se mezclan las
+fuentes: se conserva una copia reproducible de cada entrada.
+
+La zona `raw` funciona como evidencia de origen. La limpieza, el tipado y la
+unificación se realizan después en AWS Glue, hacia `trusted`.
+
+### Ingesta por fuente
+
+- **Archivos:** `ingesta_archivos.sh` sincroniza cada CSV del DANE a
+  `raw/archivos/nacimientos/anio=AAAA/`.
+- **RDS:** `ingesta_rds.sh` extrae las tres tablas de apoyo como TSV y las
+  guarda en `raw/rds/`.
+- **URL:** `ingesta_api.py` consulta Data360, pagina con `skip` y guarda cada
+  respuesta JSON en `raw/url/<indicador>/REF_AREA=<pais>/`.
+
+### Idempotencia y reejecución
+
+Las rutas de salida son deterministas. Si se ejecuta nuevamente la ingesta,
+el mismo objeto se reemplaza en lugar de crear una ruta nueva. Esto permite
+actualizar los datos sin duplicar claves lógicas y facilita reprocesar la
+zona `raw`.
+
+### Paginación y validación
+
+La API puede entregar una respuesta parcial. El script continúa aumentando
+`skip` según la cantidad de registros recibidos hasta encontrar una página sin
+datos. Antes de escribir verifica cada indicador con COL; una respuesta con
+error o vacía no produce un JSON vacío.
+
+Cada combinación indicador-país informa páginas, registros y último año. Si
+una combinación falla, las demás continúan y el proceso termina con código
+distinto de cero para que un automatizador detecte el problema.
+
+### Limitaciones
+
+- La descarga inicial de microdatos del DANE es manual por el formulario y la
+  protección anti-bot del portal.
+- La disponibilidad de años e indicadores de Data360 depende del proveedor.
+  Por ejemplo, dos indicadores pueden tener distintos años más recientes.
+- La ingesta se ejecuta manualmente o mediante un programador en la EC2; no es
+  un servicio administrado de streaming.
+
 Estos scripts se ejecutan en la EC2 y cargan las fuentes que no son los CSV
 del DANE:
 

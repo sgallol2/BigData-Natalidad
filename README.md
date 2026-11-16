@@ -25,23 +25,19 @@ Pipeline de Big Data de extremo a extremo sobre AWS. Toma datos de natalidad de 
 | **Base de datos** | Tablas de apoyo: divisiones político-administrativas (departamentos y municipios) y diccionarios de códigos de las variables | RDS MariaDB |
 | **URL** | API pública Data360 del Banco Mundial (indicadores por país y año, comenzando por la tasa bruta de natalidad) | `https://data360api.worldbank.org/data360/data` |
 
-### Datos del DANE
+Los detalles de descarga, estructura, limitaciones y decisiones de modelado de
+las fuentes están en [`02-fuentes`](02-fuentes). La ingesta y la preparación
+se documentan por separado en [`03-ingesta`](03-ingesta) y
+[`04-glue-spark`](04-glue-spark), respectivamente.
 
-- Fuente: catálogo de microdatos del DANE (`microdatos.dane.gov.co`), Estadísticas Vitales, nacimientos.
-- Registros aproximados por año (líneas del archivo menos el encabezado): 2021 → 616.914, 2022 → 573.625, 2023 → 515.549, 2024 → 453.901, 2025 → 441.537 (cerca de 2,6 millones en total, unos 400 MB).
-- Los archivos de 2021 a 2023 tienen 39 columnas; los de 2024 y 2025 tienen 40. La columna agregada es `CODPAISNACMAD`, ubicada en medio del archivo (posición 22), por lo que los años se leen **por separado y se unen por nombre de columna**, nunca por posición (ver `04-glue-spark`).
-- El portal del DANE no ofrece un enlace de descarga directo (entrega el archivo tras un formulario), por eso los archivos se descargan manualmente una vez y se alojan en la EC2, que actúa como fuente de archivos. Los datos **no se versionan en este repositorio** (solo una muestra pequeña).
+El conjunto DANE tiene cerca de 2,6 millones de registros y 424 MB. Su
+volumen es moderado, pero contiene calidad y evolución de esquema reales:
+2021-2023 tienen 39 columnas y 2024-2025 tienen 40. Los códigos geográficos
+conservan ceros a la izquierda y deben tratarse como texto.
 
-### Reglas de calidad de datos identificadas
-
-- Los códigos geográficos (`COD_DPTO`, `COD_MUNIC`) conservan ceros a la izquierda: se tratan siempre como **texto**.
-- El valor `99` significa "sin información" en `EDAD_MADRE`, `EDAD_PADRE` y otras variables, y se convierte en nulo en la zona trusted (confirmar variable por variable en el diccionario del DANE).
-- `EDAD_MADRE` es un **grupo de edad** (1 = 10-14 años, 2 = 15-19, ..., 9 = 50-54), no una edad en años. `EDAD_PADRE` sí son años cumplidos.
-
-### Banco Mundial
-
-- Base de datos `WB_WDI`; indicador verificado: `WB_WDI_SP_DYN_CBRT_IN` (tasa bruta de natalidad).
-- Otros indicadores previstos (por confirmar con la API): población total y tasa de fecundidad.
+La API Data360 usa la base `WB_WDI` e ingiere dos indicadores:
+`WB_WDI_SP_DYN_CBRT_IN` (tasa bruta de natalidad) y
+`WB_WDI_SP_POP_TOTL` (población total).
 
 ## 3. Preguntas de negocio (borrador, se afinan con el avance)
 
@@ -82,13 +78,17 @@ indicador y país.
 
 ## 5. Conceptos y tecnologías
 
-- **Data lake por zonas** (raw / trusted / refined, equivalente a bronze / silver / gold) sobre Amazon S3.
-- **Ingesta automática** multi-fuente (base de datos, archivos, API) con Python y cron.
+- **Data lake por zonas** (raw / trusted / refined, equivalente a bronze / silver / gold) sobre Amazon S3. La explicación por etapa está en [`00-infraestructura`](00-infraestructura), [`03-ingesta`](03-ingesta) y [`04-glue-spark`](04-glue-spark).
+- **Ingesta automática** multi-fuente (base de datos, archivos, API) con Python y scripts ejecutables en la EC2.
 - **Preparación de datos con Apache Spark** (PySpark) en AWS Glue: tipado, limpieza, valores faltantes y evolución de esquema entre años.
 - **Catalogación:** AWS Glue Data Catalog y tablas externas de Hive en EMR.
 - **SQL analítico** con Amazon Athena, Hive (Hue) y SparkSQL.
 - **PySpark** para análisis descriptivo en notebooks de Jupyter sobre EMR.
 - **Servicio y visualización:** AWS Lambda, API Gateway y Streamlit.
+
+La arquitectura se eligió para que el diseño no dependa del volumen actual: un
+solo equipo podría procesar los 2,6 millones de registros y 424 MB, pero si
+tuviéramos 100 veces más datos solo añadiríamos workers.
 
 ## 6. Estructura del repositorio
 

@@ -14,6 +14,46 @@ Los comandos están escritos para **Windows CMD** y región `us-east-1`, que es
 la región usada por AWS Academy en el proyecto. No se deben guardar
 contraseñas, llaves ni endpoints reales en el repositorio.
 
+## Conceptos para la sustentación
+
+### ¿Qué papel cumple cada servicio?
+
+- **Amazon S3:** almacenamiento central del data lake. Es durable, desacoplado
+  del cómputo y organiza los datos por zonas (`raw`, `trusted` y `refined`).
+- **EC2:** servidor Ubuntu que aloja temporalmente los CSV del DANE y ejecuta
+  los scripts de ingesta.
+- **RDS MariaDB:** fuente operacional estructurada para las dimensiones y
+  catálogos de apoyo.
+- **AWS Glue:** ejecuta jobs administrados de Spark para transformar `raw` a
+  `trusted`.
+- **EMR:** clúster temporal para Hive, Spark, PySpark y análisis distribuido.
+- **Athena:** consulta archivos en S3 con SQL sin moverlos a una base de datos.
+
+### Red y seguridad
+
+La VPC y sus subnets proporcionan aislamiento de red. El security group
+permite únicamente las conexiones necesarias: SSH restringido para administrar
+la EC2 y MariaDB desde los recursos autorizados del proyecto. RDS no necesita
+ser público porque la EC2 accede a él dentro de la red.
+
+Los roles `LabRole` y `LabInstanceProfile` entregan permisos temporales a
+Glue, EMR y EC2. Las credenciales de AWS no se escriben en los scripts; la
+AWS CLI y `boto3` usan la cadena de credenciales del entorno.
+
+### ¿Por qué S3 y no guardar todo en RDS?
+
+RDS es apropiado para datos estructurados y transaccionales de apoyo, pero no
+para conservar millones de filas de microdatos como archivos históricos.
+S3 permite almacenar formatos originales, Parquet procesado y resultados,
+mientras que cada motor de análisis accede al mismo almacenamiento.
+
+### Costos y ciclo de vida
+
+La EC2, RDS y especialmente EMR consumen recursos mientras están activos.
+EMR se crea solo para análisis y debe terminarse al finalizar la sesión.
+S3 conserva los datos importantes y evita depender del almacenamiento
+temporal de HDFS.
+
 ## 1. Prerrequisitos
 
 1. Iniciar una sesión de AWS Academy Learner Lab.

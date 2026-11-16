@@ -1,5 +1,51 @@
 # Preparación de datos con AWS Glue y Spark
 
+## Conceptos para la sustentación
+
+### ¿Qué resuelve la zona `trusted`?
+
+`raw` conserva los datos tal como llegaron. `trusted` contiene datos
+tipificados, limpiados y validados para que Athena, Spark y los análisis
+posteriores trabajen con un esquema confiable. Este paso corresponde a la
+preparación de datos de una arquitectura medallion (`bronze` a `silver`).
+
+### ¿Por qué AWS Glue y Apache Spark?
+
+Glue ofrece Spark administrado, por lo que no es necesario mantener
+manualmente un clúster para ejecutar las transformaciones. Spark divide el
+trabajo en particiones y puede escalar horizontalmente agregando workers.
+Además, el mismo código puede procesar archivos locales de prueba o rutas S3.
+
+El volumen es moderado (2,6 millones de registros, 424 MB), así que un solo
+equipo podría procesarlo. Lo elegimos porque cumple el objetivo del proyecto:
+practicar un pipeline de Big Data con múltiples fuentes y formatos, calidad de
+datos real y una arquitectura que escala sin cambiar el diseño: si tuviéramos
+100 veces más datos, solo añadiríamos workers.
+
+### Calidad y evolución del esquema
+
+Los CSV de nacimientos no tienen exactamente el mismo esquema todos los años.
+El job lee cada año por separado, valida el conteo y el año, y usa
+`unionByName` para no depender de la posición de las columnas. Los códigos
+geográficos se mantienen como texto para no perder ceros a la izquierda.
+
+Los valores que representan “sin información” se convierten en nulos según la
+variable. Las columnas numéricas se convierten después de la limpieza, y los
+controles de calidad quedan registrados en los logs de Glue.
+
+### Parquet, particiones y archivos pequeños
+
+Parquet es columnar, comprimido y conserva el esquema; por eso es más
+apropiado que CSV para consultas analíticas. Los nacimientos se particionan
+solo por `anio`: `mes` queda como columna normal y el filtro por año permite
+*partition pruning*, evitando leer otros años.
+
+La salida de World Bank se consolida con `coalesce(1)` y no usa
+`partitionBy`, porque son pocos registros y crear un archivo por indicador y
+país produciría archivos pequeños. Esta decisión es adecuada para este
+volumen; con un crecimiento grande habría que reconsiderar el tamaño de
+partición y el paralelismo.
+
 Este módulo transforma los microdatos de nacimientos del DANE desde la zona
 `raw` hacia la zona `trusted` del data lake en Amazon S3.
 
