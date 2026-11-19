@@ -225,7 +225,19 @@ AWS Academy se usan los roles administrados `LabRole` y
 `LabInstanceProfile`; no se deben crear roles IAM nuevos.
 
 ```bat
-aws emr create-cluster --name %PROJECT%-emr --release-label emr-6.15.0 --applications Name=Hadoop Name=Hive Name=Spark Name=JupyterEnterpriseGateway --instance-groups InstanceGroupType=MASTER,InstanceCount=1,InstanceType=m5.xlarge InstanceGroupType=CORE,InstanceCount=2,InstanceType=m5.xlarge --ec2-attributes InstanceProfile=LabInstanceProfile,SubnetId=%SUBNET_ID% --service-role LabRole --log-uri s3://%BUCKET%/emr-logs/ --use-default-roles --visible-to-all-users --ebs-root-volume-size 30 --tags Project=%PROJECT%
+aws emr create-cluster \
+ --name "bigdata-p2-emr" \
+ --log-uri "s3://bigdata-p2-190565384867/emr-logs" \
+ --release-label "emr-6.15.0" \
+ --service-role "arn:aws:iam::190565384867:role/EMR_DefaultRole" \
+ --unhealthy-node-replacement \
+ --ec2-attributes '{"InstanceProfile":"EMR_EC2_DefaultRole","EmrManagedMasterSecurityGroup":"sg-006ea68a8e0dabda9","EmrManagedSlaveSecurityGroup":"sg-0713416bec93cf0cd","KeyName":"vockey","AdditionalMasterSecurityGroups":[],"AdditionalSlaveSecurityGroups":[],"SubnetIds":["subnet-0188cdde1d8310dc3"]}' \
+ --applications Name=HBase Name=HCatalog Name=Hadoop Name=Hive Name=Hue Name=JupyterEnterpriseGateway Name=JupyterHub Name=Livy Name=Spark Name=Zeppelin \
+ --configurations '[{"Classification":"hive-site","Properties":{"hive.metastore.client.factory.class":"com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory"}},{"Classification":"spark-hive-site","Properties":{"hive.metastore.client.factory.class":"com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory"}}]' \
+ --instance-groups '[{"InstanceCount":1,"InstanceGroupType":"CORE","Name":"Central","InstanceType":"m5.xlarge","EbsConfiguration":{"EbsBlockDeviceConfigs":[{"VolumeSpecification":{"VolumeType":"gp2","SizeInGB":32},"VolumesPerInstance":2}]}},{"InstanceCount":1,"InstanceGroupType":"MASTER","Name":"Principal","InstanceType":"m5.xlarge","EbsConfiguration":{"EbsBlockDeviceConfigs":[{"VolumeSpecification":{"VolumeType":"gp2","SizeInGB":32},"VolumesPerInstance":2}]}},{"InstanceCount":1,"InstanceGroupType":"TASK","Name":"Tarea - 1","InstanceType":"m5.xlarge","EbsConfiguration":{"EbsBlockDeviceConfigs":[{"VolumeSpecification":{"VolumeType":"gp2","SizeInGB":32},"VolumesPerInstance":2}]}}]' \
+ --scale-down-behavior "TERMINATE_AT_TASK_COMPLETION" \
+ --auto-termination-policy '{"IdleTimeout":3600}' \
+ --region "us-east-1"
 ```
 
 Si la cuenta no acepta `--use-default-roles` porque AWS Academy ya expone
